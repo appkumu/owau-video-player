@@ -4,69 +4,52 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
   html, body { margin: 0; padding: 0; background: black; height: 100%; overflow: hidden; }
-  #player { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+  iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; }
   #instagram-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; overflow-y: auto; background: black; display: flex; align-items: center; justify-content: center; }
 </style>
 </head>
 <body>
-<div id="player"></div>
+<div id="tiktok-container"></div>
 <div id="instagram-container" style="display:none;"></div>
 
-<script src="https://www.youtube.com/iframe_api"></script>
 <script>
-  // Reads platform + either (videoId/start) for YouTube, or a Supabase
-  // row id for Instagram, from this page's own URL query params. This is
-  // a genuinely static file, which is why GitHub Pages (unlike Supabase
-  // Edge Functions, which don't support serving HTML at all) can serve it
-  // correctly as real, renderable HTML.
+  // Reads platform + either a TikTok post id (for platform=tiktok), or a
+  // Supabase row id (for platform=instagram), from this page's own URL
+  // query params. This is a genuinely static file, which is why GitHub
+  // Pages (unlike Supabase Edge Functions, which don't support serving
+  // HTML at all) can serve it correctly as real, renderable HTML.
   const params = new URLSearchParams(window.location.search);
-  const platform = params.get('platform') || 'youtube';
-  let ytPlayer = null;
+  const platform = params.get('platform') || 'tiktok';
 
   if (platform === 'instagram') {
     loadInstagram(params.get('rowId'));
-  }
-  // YouTube loads itself via onYouTubeIframeAPIReady below, once the
-  // IFrame API script has finished loading.
-
-  function onYouTubeIframeAPIReady() {
-    if (platform !== 'youtube') return;
-    const videoId = params.get('videoId') || '';
-    const start = parseInt(params.get('start') || '0', 10);
-
-    ytPlayer = new YT.Player('player', {
-      height: '100%',
-      width: '100%',
-      videoId: videoId,
-      host: 'https://www.youtube-nocookie.com',
-      playerVars: {
-        start: start,
-        controls: 0,
-        modestbranding: 1,
-        playsinline: 1,
-        rel: 0,
-        mute: 1
-      }
-    });
+  } else {
+    loadTikTok(params.get('postId') || '');
   }
 
-  // Using the real IFrame API (rather than reloading the iframe's src
-  // with a new mute= parameter) means play/pause/mute can all be called
-  // directly on the existing player without ever reloading it — which
-  // avoids restarting the video and avoids losing the "this was a direct
-  // user tap" context iOS requires to actually allow unmuted audio.
-  function playSample() {
-    if (ytPlayer && ytPlayer.playVideo) ytPlayer.playVideo();
+  function loadTikTok(postId) {
+    const container = document.getElementById('tiktok-container');
+    container.innerHTML =
+      '<iframe id="tt-player" allow="autoplay; fullscreen" src="' +
+      'https://www.tiktok.com/player/v1/' + postId +
+      '?controls=0&autoplay=1&muted=1&loop=1&rel=0&native_context_menu=0' +
+      '"></iframe>';
   }
-  function pauseSample() {
-    if (ytPlayer && ytPlayer.pauseVideo) ytPlayer.pauseVideo();
+
+  // TikTok's official embed player is controlled via window.postMessage
+  // to the iframe's contentWindow, per their documented API — not a
+  // global JS object the way YouTube's IFrame API works. Each message
+  // must include "x-tiktok-player": true to be recognized.
+  function sendToTikTok(type, value) {
+    const iframe = document.getElementById('tt-player');
+    if (!iframe || !iframe.contentWindow) return;
+    iframe.contentWindow.postMessage({ type: type, value: value, 'x-tiktok-player': true }, '*');
   }
-  function muteSample() {
-    if (ytPlayer && ytPlayer.mute) ytPlayer.mute();
-  }
-  function unmuteSample() {
-    if (ytPlayer && ytPlayer.unMute) ytPlayer.unMute();
-  }
+
+  function playSample() { sendToTikTok('play'); }
+  function pauseSample() { sendToTikTok('pause'); }
+  function muteSample() { sendToTikTok('mute'); }
+  function unmuteSample() { sendToTikTok('unMute'); }
 
   // Fetches the embed_html for one row directly from Supabase using just
   // the row's id — avoids ever needing to pass Instagram's full embed
@@ -75,7 +58,7 @@
     const SUPABASE_URL = "https://efidvkbdbdddfldkjois.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVmaWR2a2JkYmRkZGZsZGtqb2lzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ2NzU3OTYsImV4cCI6MjEwMDI1MTc5Nn0.q8x2-rN8Cl31dFIwOhs4P0kX1GTvj_Zen7t8w5x8sTs";
 
-    document.getElementById('player').style.display = 'none';
+    document.getElementById('tiktok-container').style.display = 'none';
     const instaContainer = document.getElementById('instagram-container');
     instaContainer.style.display = 'flex';
 
