@@ -41,9 +41,11 @@
   function muteSample() { sendToTikTok('mute'); }
   function unmuteSample() { sendToTikTok('unMute'); }
 
+  let testMuted = false;
   document.getElementById('test-unmute-btn').addEventListener('click', function() {
-    unmuteSample();
-    this.textContent = 'Sent unMute!';
+    testMuted = !testMuted;
+    if (testMuted) { muteSample(); this.textContent = 'TEST: Unmute'; }
+    else { unmuteSample(); this.textContent = 'TEST: Mute'; }
   });
 </script>
 </body>
