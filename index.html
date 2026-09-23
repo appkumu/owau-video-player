@@ -9,7 +9,6 @@
 </head>
 <body>
 <div id="tiktok-container"></div>
-<button id="test-unmute-btn" style="position:absolute;bottom:20px;left:20px;z-index:999;padding:12px 20px;font-size:16px;">TEST: Unmute</button>
 
 <script>
   // Reads a TikTok post id from this page's own URL query params
@@ -40,13 +39,6 @@
   function pauseSample() { sendToTikTok('pause'); }
   function muteSample() { sendToTikTok('mute'); }
   function unmuteSample() { sendToTikTok('unMute'); }
-
-  let testMuted = false;
-  document.getElementById('test-unmute-btn').addEventListener('click', function() {
-    testMuted = !testMuted;
-    if (testMuted) { muteSample(); this.textContent = 'TEST: Unmute'; }
-    else { unmuteSample(); this.textContent = 'TEST: Mute'; }
-  });
 </script>
 </body>
 </html>
