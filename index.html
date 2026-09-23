@@ -5,36 +5,25 @@
 <style>
   html, body { margin: 0; padding: 0; background: black; height: 100%; overflow: hidden; }
   iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; }
-  #instagram-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; overflow-y: auto; background: black; display: flex; align-items: center; justify-content: center; }
 </style>
 </head>
 <body>
 <div id="tiktok-container"></div>
-<div id="instagram-container" style="display:none;"></div>
 
 <script>
-  // Reads platform + either a TikTok post id (for platform=tiktok), or a
-  // Supabase row id (for platform=instagram), from this page's own URL
-  // query params. This is a genuinely static file, which is why GitHub
+  // Reads a TikTok post id from this page's own URL query params
+  // (?postId=...). This is a genuinely static file, which is why GitHub
   // Pages (unlike Supabase Edge Functions, which don't support serving
   // HTML at all) can serve it correctly as real, renderable HTML.
   const params = new URLSearchParams(window.location.search);
-  const platform = params.get('platform') || 'tiktok';
+  const postId = params.get('postId') || '';
 
-  if (platform === 'instagram') {
-    loadInstagram(params.get('rowId'));
-  } else {
-    loadTikTok(params.get('postId') || '');
-  }
-
-  function loadTikTok(postId) {
-    const container = document.getElementById('tiktok-container');
-    container.innerHTML =
-      '<iframe id="tt-player" allow="autoplay; fullscreen" src="' +
-      'https://www.tiktok.com/player/v1/' + postId +
-      '?controls=0&autoplay=1&muted=1&loop=1&rel=0&native_context_menu=0' +
-      '"></iframe>';
-  }
+  const container = document.getElementById('tiktok-container');
+  container.innerHTML =
+    '<iframe id="tt-player" allow="autoplay; fullscreen" src="' +
+    'https://www.tiktok.com/player/v1/' + postId +
+    '?controls=0&autoplay=1&muted=1&loop=1&rel=0&native_context_menu=0' +
+    '"></iframe>';
 
   // TikTok's official embed player is controlled via window.postMessage
   // to the iframe's contentWindow, per their documented API — not a
@@ -50,48 +39,6 @@
   function pauseSample() { sendToTikTok('pause'); }
   function muteSample() { sendToTikTok('mute'); }
   function unmuteSample() { sendToTikTok('unMute'); }
-
-  // Fetches the embed_html for one row directly from Supabase using just
-  // the row's id — avoids ever needing to pass Instagram's full embed
-  // snippet (which includes quotes and a script tag) through a URL.
-  async function loadInstagram(rowId) {
-    const SUPABASE_URL = "https://efidvkbdbdddfldkjois.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVmaWR2a2JkYmRkZGZsZGtqb2lzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ2NzU3OTYsImV4cCI6MjEwMDI1MTc5Nn0.q8x2-rN8Cl31dFIwOhs4P0kX1GTvj_Zen7t8w5x8sTs";
-
-    document.getElementById('tiktok-container').style.display = 'none';
-    const instaContainer = document.getElementById('instagram-container');
-    instaContainer.style.display = 'flex';
-
-    try {
-      const res = await fetch(
-        SUPABASE_URL + '/rest/v1/creator_videos?id=eq.' + rowId + '&select=embed_html',
-        { headers: { apikey: SUPABASE_ANON_KEY, Authorization: 'Bearer ' + SUPABASE_ANON_KEY } }
-      );
-      const rows = await res.json();
-      const embedHtml = rows && rows[0] && rows[0].embed_html;
-      if (!embedHtml) {
-        instaContainer.innerHTML = '<p style="color:white;font-family:sans-serif;">Couldn\'t load this post.</p>';
-        return;
-      }
-
-      // Injecting via innerHTML alone does not execute the <script> tag
-      // Instagram's embed HTML includes (browsers don't run scripts added
-      // this way) — so the blockquote markup and the script are inserted
-      // separately, with the script recreated as a real element so it
-      // actually runs and converts the blockquote into the live embed.
-      instaContainer.innerHTML = embedHtml;
-      const oldScript = instaContainer.querySelector('script');
-      if (oldScript) {
-        const newScript = document.createElement('script');
-        newScript.async = true;
-        newScript.src = oldScript.src || 'https://www.instagram.com/embed.js';
-        oldScript.remove();
-        document.body.appendChild(newScript);
-      }
-    } catch (e) {
-      instaContainer.innerHTML = '<p style="color:white;font-family:sans-serif;">Couldn\'t load this post.</p>';
-    }
-  }
 </script>
 </body>
 </html>
