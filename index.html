@@ -29,10 +29,23 @@
   // to the iframe's contentWindow, per their documented API — not a
   // global JS object the way YouTube's IFrame API works. Each message
   // must include "x-tiktok-player": true to be recognized.
+  //
+  // The outer page loading doesn't guarantee the nested TikTok iframe has
+  // finished initializing its own message listener yet — sending once
+  // right away can silently miss that window, causing intermittent
+  // failures depending on exact timing. Retrying a few times with short
+  // delays gives it multiple chances to land once the iframe is ready.
   function sendToTikTok(type, value) {
-    const iframe = document.getElementById('tt-player');
-    if (!iframe || !iframe.contentWindow) return;
-    iframe.contentWindow.postMessage({ type: type, value: value, 'x-tiktok-player': true }, '*');
+    let attempts = 0;
+    const trySend = () => {
+      const iframe = document.getElementById('tt-player');
+      if (iframe && iframe.contentWindow) {
+        iframe.contentWindow.postMessage({ type: type, value: value, 'x-tiktok-player': true }, '*');
+      }
+      attempts++;
+      if (attempts < 5) setTimeout(trySend, 200);
+    };
+    trySend();
   }
 
   function playSample() { sendToTikTok('play'); }
