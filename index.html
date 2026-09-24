@@ -64,18 +64,38 @@
     iframe.contentWindow.postMessage({ type: type, value: value, 'x-tiktok-player': true }, '*');
   }
 
-  function playSample() { sendToTikTok('play'); }
+  // Restarts from the beginning and plays, using the same retry-until-
+  // confirmed pattern as mute — a single, unretried postMessage call was
+  // likely why playback sometimes silently failed to resume when
+  // switching between videos (the same "sent before the iframe was ready"
+  // issue mute had). Retries stop as soon as onStateChange confirms
+  // playback actually started.
+  let playRetryTimer = null;
+
+  function playSample() {
+    if (playRetryTimer) clearTimeout(playRetryTimer);
+    let attempts = 0;
+    const trySend = () => {
+      sendToTikTok('seekTo', 0);
+      sendToTikTok('play');
+      attempts++;
+      if (attempts < 5) playRetryTimer = setTimeout(trySend, 100);
+    };
+    trySend();
+  }
+
   function pauseSample() { sendToTikTok('pause'); }
   function muteSample() { sendMuteState(true); }
   function unmuteSample() { sendMuteState(false); }
 
   // Player-to-host messages, per TikTok's documented events. onMute
-  // confirms our command actually landed, so retries can stop right away
-  // instead of continuing to fire for up to a second. onStateChange firing
-  // with value 1 ("playing") happens on every loop restart too — the
-  // player appears to reset toward its own default briefly at that point,
-  // which is why it very briefly unmutes on loop; re-sending the current
-  // mute state at that exact moment corrects it immediately.
+  // confirms our mute command actually landed, so those retries can stop
+  // right away instead of continuing to fire for up to a second.
+  // onStateChange firing with value 1 ("playing") confirms play actually
+  // started, so those retries can stop too — it also fires on every loop
+  // restart, at which point the player appears to reset toward its own
+  // default briefly (why it very briefly unmutes on loop), so the current
+  // mute state gets re-applied at that exact moment to correct it.
   window.addEventListener('message', (event) => {
     const data = event.data;
     if (!data || !data['x-tiktok-player']) return;
@@ -84,6 +104,10 @@
       muteRetryTimer = null;
     }
     if (data.type === 'onStateChange' && data.value === 1) {
+      if (playRetryTimer) {
+        clearTimeout(playRetryTimer);
+        playRetryTimer = null;
+      }
       sendMuteState(currentMuted);
     }
   });
